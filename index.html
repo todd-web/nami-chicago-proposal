@@ -439,8 +439,10 @@ h1, h2, h3 {
 .bar-la { background: var(--tan); }
 
 @media (max-width: 600px) {
-  .comparison-bar { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
-  .bar-label { width: auto; text-align: left; }
+  .comparison-bar { gap: 0.5rem; }
+  .bar-label { width: 100px; font-size: 0.7rem; text-align: left; }
+  .bar-track { height: 24px; }
+  .bar-fill span { font-size: 0.6rem; padding-right: 8px; }
 }
 
 
@@ -864,28 +866,26 @@ h1, h2, h3 {
   .opportunity-scroll-container { flex-direction: column; }
   .map-column { width: 100%; }
   .map-sticky-inner {
-    position: relative;
+    position: sticky;
+    top: 0;
     height: auto;
-    padding: 4rem 2rem 2rem;
+    padding: 2rem 2rem 1rem;
+    z-index: 5;
+    background: var(--navy);
   }
   .map-scroll-content {
     width: 100%;
     padding: 2rem 1.5rem 4rem;
   }
   .chicago-map-wrap {
-    max-width: 300px;
+    max-width: 280px;
     margin: 0 auto;
   }
-  .map-content-block { min-height: auto; padding: 1.5rem 0; }
-  .map-stat-card { min-height: auto; padding: 1rem 0; }
-  .map-content-block h2,
-  .map-content-block p,
-  .map-section-label,
-  .stat-inner { opacity: 1 !important; transform: none !important; }
+  .map-content-block { min-height: 60vh; padding: 1.5rem 0; }
+  .map-stat-card { min-height: 50vh; padding: 1rem 0; }
   #chicago-d3-map .community-area.region-glow {
     fill: #BFA870;
-    filter: drop-shadow(0 0 8px rgba(191, 168, 112, 0.4));
-    animation: none;
+    filter: drop-shadow(0 0 12px rgba(191, 168, 112, 0.5));
   }
 }
 
@@ -2293,60 +2293,45 @@ h1, h2, h3 {
   }
 
   function initMapScrollTriggers() {
-    // Mobile: light up all regions immediately
-    if (window.innerWidth <= 900) {
-      setTimeout(function() {
-        setRegionGlow('south', true);
-        setRegionGlow('west', true);
-        setConnections(true);
-        document.querySelectorAll('.map-section-label, .map-content-block h2, .map-content-block p, .stat-inner').forEach(function(el) {
-          el.classList.add('visible');
-        });
-      }, 400);
-    } else {
-      // Desktop: Scroll-position-based BIDIRECTIONAL animation
-      // As you scroll down, regions light up. As you scroll back up, they un-light.
-      var chiBlocks = document.querySelectorAll('[data-trigger]');
-      var triggerOrder = ['intro', 'south', 'west', 'connections', 'all'];
+    // Same scroll-based bidirectional animation for BOTH mobile and desktop
+    var chiBlocks = document.querySelectorAll('[data-trigger]');
 
-      function updateMapState() {
-        var activeTriggers = new Set();
+    function updateMapState() {
+      var activeTriggers = new Set();
 
-        chiBlocks.forEach(function(block) {
-          var rect = block.getBoundingClientRect();
-          var trigger = block.getAttribute('data-trigger');
-          // Block is "active" when its top is above 70% of viewport height
-          var isActive = rect.top < window.innerHeight * 0.7;
+      chiBlocks.forEach(function(block) {
+        var rect = block.getBoundingClientRect();
+        var trigger = block.getAttribute('data-trigger');
+        // Block is "active" when its top is above 70% of viewport height
+        var isActive = rect.top < window.innerHeight * 0.7;
 
-          if (isActive) {
-            activeTriggers.add(trigger);
-            block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
-              el.classList.add('visible');
-            });
-            block.querySelectorAll('.stat-inner').forEach(function(el) {
-              el.classList.add('visible');
-            });
-          } else {
-            // Scrolled back up past this block - remove visibility
-            block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
-              el.classList.remove('visible');
-            });
-            block.querySelectorAll('.stat-inner').forEach(function(el) {
-              el.classList.remove('visible');
-            });
-          }
-        });
+        if (isActive) {
+          activeTriggers.add(trigger);
+          block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
+            el.classList.add('visible');
+          });
+          block.querySelectorAll('.stat-inner').forEach(function(el) {
+            el.classList.add('visible');
+          });
+        } else {
+          block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
+            el.classList.remove('visible');
+          });
+          block.querySelectorAll('.stat-inner').forEach(function(el) {
+            el.classList.remove('visible');
+          });
+        }
+      });
 
-        // Set region glow based on which triggers are active
-        setRegionGlow('south', activeTriggers.has('south') || activeTriggers.has('all'));
-        setRegionGlow('west', activeTriggers.has('west') || activeTriggers.has('connections') || activeTriggers.has('all'));
-        setConnections(activeTriggers.has('connections') || activeTriggers.has('all'));
-      }
-
-      window.addEventListener('scroll', updateMapState, { passive: true });
-      // Initial check
-      updateMapState();
+      // Set region glow based on which triggers are active
+      setRegionGlow('south', activeTriggers.has('south') || activeTriggers.has('all'));
+      setRegionGlow('west', activeTriggers.has('west') || activeTriggers.has('connections') || activeTriggers.has('all'));
+      setConnections(activeTriggers.has('connections') || activeTriggers.has('all'));
     }
+
+    window.addEventListener('scroll', updateMapState, { passive: true });
+    // Initial check
+    updateMapState();
   }
 
   // Build the map after page loads
