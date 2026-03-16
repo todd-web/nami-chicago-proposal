@@ -881,8 +881,9 @@ h1, h2, h3 {
     max-width: 280px;
     margin: 0 auto;
   }
-  .map-content-block { min-height: 60vh; padding: 1.5rem 0; }
-  .map-stat-card { min-height: 50vh; padding: 1rem 0; }
+  .map-content-block { min-height: 70vh; padding: 1.5rem 0; }
+  .map-content-block:first-child { min-height: 40vh; } /* intro block shorter so map animation starts right away */
+  .map-stat-card { min-height: 60vh; padding: 1rem 0; }
   #chicago-d3-map .community-area.region-glow {
     fill: #BFA870;
     filter: drop-shadow(0 0 12px rgba(191, 168, 112, 0.5));
@@ -2293,45 +2294,90 @@ h1, h2, h3 {
   }
 
   function initMapScrollTriggers() {
-    // Same scroll-based bidirectional animation for BOTH mobile and desktop
     var chiBlocks = document.querySelectorAll('[data-trigger]');
+    var isMobile = window.innerWidth <= 900;
 
-    function updateMapState() {
-      var activeTriggers = new Set();
+    if (isMobile) {
+      // MOBILE: Map animation driven by scroll position within the section
+      // Map stays sticky, glow phases trigger based on % scrolled through section
+      // Animation happens FIRST before content scrolls past
+      var oppSection = document.getElementById('opportunity');
 
-      chiBlocks.forEach(function(block) {
-        var rect = block.getBoundingClientRect();
-        var trigger = block.getAttribute('data-trigger');
-        // Block is "active" when its top is above 70% of viewport height
-        var isActive = rect.top < window.innerHeight * 0.7;
+      function updateMapMobile() {
+        if (!oppSection) return;
+        var rect = oppSection.getBoundingClientRect();
+        var sectionHeight = oppSection.offsetHeight;
+        var scrolledInto = -rect.top; // how far we've scrolled into the section
+        var pct = Math.max(0, Math.min(1, scrolledInto / (sectionHeight * 0.4))); // animate in first 40% of section scroll
 
-        if (isActive) {
-          activeTriggers.add(trigger);
-          block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
-            el.classList.add('visible');
-          });
-          block.querySelectorAll('.stat-inner').forEach(function(el) {
-            el.classList.add('visible');
-          });
-        } else {
-          block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
-            el.classList.remove('visible');
-          });
-          block.querySelectorAll('.stat-inner').forEach(function(el) {
-            el.classList.remove('visible');
-          });
-        }
-      });
+        // Progressive glow based on scroll percentage
+        setRegionGlow('south', pct > 0.1);
+        setRegionGlow('west', pct > 0.35);
+        setConnections(pct > 0.6);
 
-      // Set region glow based on which triggers are active
-      setRegionGlow('south', activeTriggers.has('south') || activeTriggers.has('all'));
-      setRegionGlow('west', activeTriggers.has('west') || activeTriggers.has('connections') || activeTriggers.has('all'));
-      setConnections(activeTriggers.has('connections') || activeTriggers.has('all'));
+        // Show/hide stat cards based on scroll
+        chiBlocks.forEach(function(block) {
+          var blockRect = block.getBoundingClientRect();
+          var trigger = block.getAttribute('data-trigger');
+          var isActive = blockRect.top < window.innerHeight * 0.85;
+
+          if (isActive) {
+            block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
+              el.classList.add('visible');
+            });
+            block.querySelectorAll('.stat-inner').forEach(function(el) {
+              el.classList.add('visible');
+            });
+          } else {
+            block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
+              el.classList.remove('visible');
+            });
+            block.querySelectorAll('.stat-inner').forEach(function(el) {
+              el.classList.remove('visible');
+            });
+          }
+        });
+      }
+
+      window.addEventListener('scroll', updateMapMobile, { passive: true });
+      updateMapMobile();
+
+    } else {
+      // DESKTOP: Scroll-position-based BIDIRECTIONAL animation
+      function updateMapState() {
+        var activeTriggers = new Set();
+
+        chiBlocks.forEach(function(block) {
+          var rect = block.getBoundingClientRect();
+          var trigger = block.getAttribute('data-trigger');
+          var isActive = rect.top < window.innerHeight * 0.7;
+
+          if (isActive) {
+            activeTriggers.add(trigger);
+            block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
+              el.classList.add('visible');
+            });
+            block.querySelectorAll('.stat-inner').forEach(function(el) {
+              el.classList.add('visible');
+            });
+          } else {
+            block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
+              el.classList.remove('visible');
+            });
+            block.querySelectorAll('.stat-inner').forEach(function(el) {
+              el.classList.remove('visible');
+            });
+          }
+        });
+
+        setRegionGlow('south', activeTriggers.has('south') || activeTriggers.has('all'));
+        setRegionGlow('west', activeTriggers.has('west') || activeTriggers.has('connections') || activeTriggers.has('all'));
+        setConnections(activeTriggers.has('connections') || activeTriggers.has('all'));
+      }
+
+      window.addEventListener('scroll', updateMapState, { passive: true });
+      updateMapState();
     }
-
-    window.addEventListener('scroll', updateMapState, { passive: true });
-    // Initial check
-    updateMapState();
   }
 
   // Build the map after page loads
