@@ -640,11 +640,30 @@ h1, h2, h3 {
 .opportunity {
   position: relative;
   background: var(--navy);
+  /* Tall enough to give scroll room for the animation */
+  min-height: 350vh;
+}
+
+.opportunity-sticky-viewport {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
 }
 
 .opportunity-scroll-container {
   display: flex;
   position: relative;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 100%;
 }
 
 .map-column {
@@ -863,27 +882,45 @@ h1, h2, h3 {
 }
 
 @media (max-width: 900px) {
-  .opportunity-scroll-container { flex-direction: column; }
-  .map-column { width: 100%; }
+  .opportunity-scroll-container {
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+  }
+  .map-column {
+    width: 100%;
+    height: 45vh;
+    flex-shrink: 0;
+  }
   .map-sticky-inner {
-    position: sticky;
-    top: 0;
-    height: auto;
-    padding: 2rem 2rem 1rem;
-    z-index: 5;
-    background: var(--navy);
+    position: relative;
+    height: 100%;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .map-scroll-content {
     width: 100%;
-    padding: 2rem 1.5rem 4rem;
+    padding: 1rem 1.5rem;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .chicago-map-wrap {
-    max-width: 280px;
+    max-width: 260px;
     margin: 0 auto;
   }
-  .map-content-block { min-height: 70vh; padding: 1.5rem 0; }
-  .map-content-block:first-child { min-height: 40vh; } /* intro block shorter so map animation starts right away */
-  .map-stat-card { min-height: 60vh; padding: 1rem 0; }
+  /* Only show the ACTIVE block - others are hidden by JS */
+  .map-content-block, .map-stat-card {
+    min-height: auto;
+    padding: 0;
+    position: absolute;
+  }
+  .map-content-block { position: relative; }
+  .map-stat-card { position: relative; }
+  .stat-inner { padding: 1.5rem; }
   #chicago-d3-map .community-area.region-glow {
     fill: #BFA870;
     filter: drop-shadow(0 0 12px rgba(191, 168, 112, 0.5));
@@ -1616,6 +1653,7 @@ h1, h2, h3 {
      SECTION 3: THE OPPORTUNITY (CHICAGO MAP)
      ============================================ -->
 <section class="opportunity" id="opportunity">
+  <div class="opportunity-sticky-viewport">
   <div class="map-progress" id="mapProgress"></div>
   <div class="opportunity-scroll-container">
 
@@ -1675,6 +1713,7 @@ h1, h2, h3 {
 
     </div>
   </div>
+  </div><!-- close opportunity-sticky-viewport -->
 </section>
 
 <!-- ============================================
@@ -2294,90 +2333,97 @@ h1, h2, h3 {
   }
 
   function initMapScrollTriggers() {
+    // SCROLL-LOCK PATTERN: The entire opportunity section is 350vh tall.
+    // The visible content is position:sticky (stays in viewport).
+    // Scrolling through the section drives the map animation.
+    // Same behavior on mobile AND desktop - like Kingdom OS nodes.
+    var oppSection = document.getElementById('opportunity');
     var chiBlocks = document.querySelectorAll('[data-trigger]');
-    var isMobile = window.innerWidth <= 900;
 
-    if (isMobile) {
-      // MOBILE: Map animation driven by scroll position within the section
-      // Map stays sticky, glow phases trigger based on % scrolled through section
-      // Animation happens FIRST before content scrolls past
-      var oppSection = document.getElementById('opportunity');
+    // Map stat card text - show based on scroll phases
+    var introBlock = document.querySelector('[data-trigger="intro"]');
+    var southBlock = document.querySelector('[data-trigger="south"]');
+    var westBlock = document.querySelector('[data-trigger="west"]');
+    var connBlock = document.querySelector('[data-trigger="connections"]');
+    var allBlock = document.querySelector('[data-trigger="all"]');
+    var finalBlock = document.querySelector('[data-trigger="final"]');
 
-      function updateMapMobile() {
-        if (!oppSection) return;
-        var rect = oppSection.getBoundingClientRect();
-        var sectionHeight = oppSection.offsetHeight;
-        var scrolledInto = -rect.top; // how far we've scrolled into the section
-        var pct = Math.max(0, Math.min(1, scrolledInto / (sectionHeight * 0.4))); // animate in first 40% of section scroll
-
-        // Progressive glow based on scroll percentage
-        setRegionGlow('south', pct > 0.1);
-        setRegionGlow('west', pct > 0.35);
-        setConnections(pct > 0.6);
-
-        // Show/hide stat cards based on scroll
-        chiBlocks.forEach(function(block) {
-          var blockRect = block.getBoundingClientRect();
-          var trigger = block.getAttribute('data-trigger');
-          var isActive = blockRect.top < window.innerHeight * 0.85;
-
-          if (isActive) {
-            block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
-              el.classList.add('visible');
-            });
-            block.querySelectorAll('.stat-inner').forEach(function(el) {
-              el.classList.add('visible');
-            });
-          } else {
-            block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
-              el.classList.remove('visible');
-            });
-            block.querySelectorAll('.stat-inner').forEach(function(el) {
-              el.classList.remove('visible');
-            });
-          }
-        });
-      }
-
-      window.addEventListener('scroll', updateMapMobile, { passive: true });
-      updateMapMobile();
-
-    } else {
-      // DESKTOP: Scroll-position-based BIDIRECTIONAL animation
-      function updateMapState() {
-        var activeTriggers = new Set();
-
-        chiBlocks.forEach(function(block) {
-          var rect = block.getBoundingClientRect();
-          var trigger = block.getAttribute('data-trigger');
-          var isActive = rect.top < window.innerHeight * 0.7;
-
-          if (isActive) {
-            activeTriggers.add(trigger);
-            block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
-              el.classList.add('visible');
-            });
-            block.querySelectorAll('.stat-inner').forEach(function(el) {
-              el.classList.add('visible');
-            });
-          } else {
-            block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) {
-              el.classList.remove('visible');
-            });
-            block.querySelectorAll('.stat-inner').forEach(function(el) {
-              el.classList.remove('visible');
-            });
-          }
-        });
-
-        setRegionGlow('south', activeTriggers.has('south') || activeTriggers.has('all'));
-        setRegionGlow('west', activeTriggers.has('west') || activeTriggers.has('connections') || activeTriggers.has('all'));
-        setConnections(activeTriggers.has('connections') || activeTriggers.has('all'));
-      }
-
-      window.addEventListener('scroll', updateMapState, { passive: true });
-      updateMapState();
+    function showBlock(block) {
+      if (!block) return;
+      block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) { el.classList.add('visible'); });
+      block.querySelectorAll('.stat-inner').forEach(function(el) { el.classList.add('visible'); });
     }
+    function hideBlock(block) {
+      if (!block) return;
+      block.querySelectorAll('.map-section-label, h2, p').forEach(function(el) { el.classList.remove('visible'); });
+      block.querySelectorAll('.stat-inner').forEach(function(el) { el.classList.remove('visible'); });
+    }
+
+    // Hide all stat cards initially - only the current phase card shows
+    function hideAllBlocks() {
+      chiBlocks.forEach(function(b) { hideBlock(b); });
+    }
+
+    function updateMapScroll() {
+      if (!oppSection) return;
+      var rect = oppSection.getBoundingClientRect();
+      var sectionHeight = oppSection.offsetHeight - window.innerHeight;
+      var scrolledInto = -rect.top;
+      var pct = Math.max(0, Math.min(1, scrolledInto / sectionHeight));
+
+      // Update progress bar
+      var bar = document.getElementById('mapProgress');
+      if (bar) bar.style.width = (pct * 100) + '%';
+
+      // Hide all, then show the current phase
+      hideAllBlocks();
+
+      if (pct < 0.05) {
+        // Not yet in section
+        setRegionGlow('south', false);
+        setRegionGlow('west', false);
+        setConnections(false);
+      } else if (pct < 0.2) {
+        // Phase 1: Intro text
+        showBlock(introBlock);
+        setRegionGlow('south', false);
+        setRegionGlow('west', false);
+        setConnections(false);
+      } else if (pct < 0.35) {
+        // Phase 2: South Side glows + 22.5x stat
+        showBlock(southBlock);
+        setRegionGlow('south', true);
+        setRegionGlow('west', false);
+        setConnections(false);
+      } else if (pct < 0.50) {
+        // Phase 3: West Side glows + 420K stat
+        showBlock(westBlock);
+        setRegionGlow('south', true);
+        setRegionGlow('west', true);
+        setConnections(false);
+      } else if (pct < 0.65) {
+        // Phase 4: Connections + 91% stat
+        showBlock(connBlock);
+        setRegionGlow('south', true);
+        setRegionGlow('west', true);
+        setConnections(true);
+      } else if (pct < 0.80) {
+        // Phase 5: All lit + 19->5 stat
+        showBlock(allBlock);
+        setRegionGlow('south', true);
+        setRegionGlow('west', true);
+        setConnections(true);
+      } else {
+        // Phase 6: Final message
+        showBlock(finalBlock);
+        setRegionGlow('south', true);
+        setRegionGlow('west', true);
+        setConnections(true);
+      }
+    }
+
+    window.addEventListener('scroll', updateMapScroll, { passive: true });
+    updateMapScroll();
   }
 
   // Build the map after page loads
